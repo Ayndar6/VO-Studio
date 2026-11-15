@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A browser-based voice-over recording and editing studio.">
+<title>VO Studio</title>
+<link rel="stylesheet" href="studio.css">
+<script type="module" src="studio.js"></script>
+</head>
+<body>
+<header><div class="shell top"><a class="brand" href="#record"><span class="mark" aria-hidden="true">▮▮▮</span> VO Studio</a><nav aria-label="Studio"><a id="recordTab" href="#record">Record</a><a id="editTab" href="#edit">Edit take</a></nav><span class="local">On-device audio</span></div></header>
+<main class="shell">
+<section id="recordView" aria-labelledby="recordTitle">
+<h1 id="recordTitle" tabindex="-1">Recording booth</h1>
+<div class="layout">
+<section class="panel script">
+<div class="row"><h2><label for="script">Script</label></h2><label class="font-control">Text size <input id="fontSize" type="range" min="18" max="42" value="25"></label></div>
+<textarea id="script" spellcheck="false" placeholder="Paste or type your script here…"></textarea>
+</section>
+<div class="stack">
+<section class="panel">
+<div class="row"><h2>Microphone</h2><span id="micStatus" class="tag">Off</span></div>
+<div id="meter" class="meter" role="meter" aria-label="Microphone peak in dBFS" aria-valuemin="-60" aria-valuemax="0" aria-valuenow="-60"><div id="meterFill"></div></div>
+<div class="scale" aria-hidden="true"><span>−60</span><span>−36</span><span>−18</span><span>−6</span><span>0 dBFS</span></div>
+<div class="row readout"><output id="clock">0:00.0</output><span id="clip" hidden>Near clipping</span></div>
+<div class="actions"><button id="mic" type="button">Enable mic</button><button id="record" class="primary" type="button">Record</button></div>
+<p id="recordStatus" class="feedback" role="status"></p>
+</section>
+<section class="panel"><div class="row"><h2>Takes</h2><span id="takeCount" class="tag"></span></div><div id="takes"></div></section>
+</div>
+</div>
+</section>
+<section id="editView" hidden aria-labelledby="editTitle">
+<h1 id="editTitle" tabindex="-1">Edit take</h1>
+<div id="emptyEdit" class="panel" hidden><p>Record a take to open the editor.</p><a href="#record">Go to recording booth</a></div>
+<div id="editPanel" class="layout" hidden>
+<section class="panel">
+<div class="row"><h2 id="takeTitle">Waveform</h2><span id="duration" class="tag"></span></div>
+<canvas id="wave" aria-hidden="true"></canvas>
+<audio id="preview" controls aria-label="Take preview"></audio>
+<div class="actions modes"><button id="original" aria-pressed="true">Original</button><button id="edited" aria-pressed="false">Preview edits</button></div>
+</section>
+<section class="panel">
+<h2>Adjustments</h2>
+<div class="trim"><label>Start (seconds)<input id="start" type="number" min="0" step="any" value="0"></label><label>End (seconds)<input id="end" type="number" min="0" step="any"></label></div>
+<label class="gain"><span>Gain <output id="gainValue">0 dB</output></span><input id="gain" type="range" min="-18" max="18" step="1" value="0"></label>
+<label class="check"><input id="lowCut" type="checkbox"> Low-cut filter <span>80 Hz</span></label>
+<label class="check"><input id="compress" type="checkbox"> Light compression</label>
+<div class="actions"><button id="reset">Reset</button><button id="export" class="primary">Export WAV</button></div>
+<p id="editStatus" class="feedback" role="status"></p>
+</section>
+</div>
+</section>
+</main>
+</body>
+</html>
