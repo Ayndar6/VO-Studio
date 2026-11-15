@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compare takes · VO Studio</title>
+<link rel="stylesheet" href="studio.css">
+<link rel="stylesheet" href="compare.css">
+<script type="module" src="compare.mjs"></script>
+</head>
+<body>
+<header><div class="shell top">
+<a class="brand" href="./"><span class="mark" aria-hidden="true">▮▮▮</span> VO Studio</a>
+<nav aria-label="Studio"><a href="./#record">Record</a><a href="./#edit">Edit take</a><a href="compare.html" aria-current="page">Compare takes</a></nav>
+<span class="local">On-device audio</span>
+</div></header>
+<main class="shell">
+<h1>Compare takes</h1>
+<p class="intro">Choose two WAV recordings of the same script. Compare their timing and levels, then listen to the differences.</p>
+<div class="compare-controls">
+<div class="actions"><button id="play-a" disabled>Play A</button><button id="play-b" disabled>Play B</button></div>
+<label class="check"><input id="match" type="checkbox" disabled> Match playback levels</label>
+</div>
+<div id="takes" class="compare-grid"></div>
+<template id="take-template">
+<section class="panel">
+<h2></h2>
+<label class="picker">Choose or drop a WAV<input type="file" accept=".wav,.wave,audio/wav,audio/x-wav"></label>
+<p class="feedback status" role="status"></p>
+<div class="result" hidden>
+<canvas class="wave" aria-hidden="true"></canvas>
+<audio controls preload="metadata"></audio>
+<h3>Detected pauses</h3>
+<div class="pauses"></div>
+</div>
+</section>
+</template>
+<section id="measurements" class="panel measurements" hidden>
+<h2>Measurements</h2>
+<table><thead><tr><th scope="col">Measure</th><th scope="col">Take A</th><th scope="col">Take B</th></tr></thead><tbody></tbody></table>
+<p id="timing" class="feedback" role="status"></p>
+<p class="feedback">Speech span and pauses are estimated from signal level. Quiet passages, music, and room noise can affect detection.</p>
+</section>
+</main>
+</body>
+</html>
