@@ -66,7 +66,68 @@ export function analyzeTake(buffer) {
     peak: db(peak),
     rms: db(Math.sqrt(totalEnergy / (length * channels.length))),
     speechLevel: speechWindows ? db(Math.sqrt(speechEnergy / speechWindows)) : null,
+    speechStart: regions[0]?.start ?? null,
     speechSpan: regions.length ? regions.at(-1).end - regions[0].start : null,
     quietLevel,
   };
+}
+
+export function summarizeTakes(a, b) {
+  const durationDelta = b.duration - a.duration;
+  const hasSpeechSpans = a.speechSpan !== null && b.speechSpan !== null;
+  const speechDelta = hasSpeechSpans ? b.speechSpan - a.speechSpan : null;
+  const compareTime = (delta, label) => {
+    if (Math.abs(delta) < 0.01) return 'Both takes have about the same ' + label + '.';
+    return 'Take B’s ' + label + ' is ' + Math.abs(delta).toFixed(2) +
+      ' seconds ' + (delta > 0 ? 'longer.' : 'shorter.');
+  };
+
+  const sentences = [compareTime(durationDelta, 'total duration')];
+  if (hasSpeechSpans) {
+    sentences.push(compareTime(speechDelta, 'estimated speech span'));
+    const outsideDelta = durationDelta - speechDelta;
+    if (Math.abs(outsideDelta) >= 0.05) {
+      sentences.push('Take B has about ' + Math.abs(outsideDelta).toFixed(2) +
+        ' seconds ' + (outsideDelta > 0 ? 'more' : 'less') + ' audio outside the detected speech.');
+    }
+  } else {
+    sentences.push('There wasn’t enough detected speech in both takes to compare pacing.');
+  }
+
+  if (Number.isFinite(a.rms) && Number.isFinite(b.rms)) {
+    const delta = b.rms - a.rms;
+    sentences.push(Math.abs(delta) < 0.1
+      ? 'The average levels are about the same.'
+      : 'Take B is ' + Math.abs(delta).toFixed(1) + ' dB ' +
+        (delta > 0 ? 'louder' : 'quieter') + ' on average.');
+  } else if (a.rms === -Infinity || b.rms === -Infinity) {
+    const silent = a.rms === b.rms ? 'Both takes contain' : (a.rms === -Infinity ? 'Take A contains' : 'Take B contains');
+    sentences.push(silent + ' digital silence throughout.');
+  }
+
+  const clipping = [a.nearFullScale, b.nearFullScale];
+  if (clipping.some(Boolean)) {
+    const subject = clipping.every(Boolean) ? 'Both takes show' : (clipping[0] ? 'Take A shows' : 'Take B shows');
+    sentences.push(subject + ' possible clipping.');
+  } else {
+    sentences.push('Neither take showed possible clipping.');
+  }
+
+  const pauses = [a.pauses.length, b.pauses.length];
+  if (!pauses.some(Boolean)) {
+    if (hasSpeechSpans) sentences.push('No internal pauses of 0.30 seconds or longer were detected.');
+  } else {
+    const count = (total) => total + ' detected pause' + (total === 1 ? '' : 's');
+    sentences.push('Take A had ' + count(pauses[0]) + ' and Take B had ' + count(pauses[1]) + '.');
+  }
+
+  const tip = clipping.some(Boolean)
+    ? 'Listen for harsh or crackly peaks in the flagged take.'
+    : pauses[0] !== pauses[1]
+      ? 'Jump to the highlighted pauses and listen to how the pauses affect the delivery.'
+      : hasSpeechSpans
+        ? 'Turn on Match playback levels and switch between A and B. Listen for differences in pace and emphasis.'
+        : 'Play each take and check that the voice is audible throughout the read.';
+
+  return { text: sentences.join(' '), tip };
 }

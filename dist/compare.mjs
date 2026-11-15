@@ -1,12 +1,18 @@
-import { analyzeTake } from './compare-analysis.mjs';
+import { analyzeTake, summarizeTakes } from './compare-analysis.mjs';
 
 const template = document.querySelector('#take-template');
 const match = document.querySelector('#match');
+const playBoth = document.querySelector('#play-both');
+const align = document.querySelector('#align');
+const split = document.querySelector('#split');
+const pairStatus = document.querySelector('#pair-status');
 const measurements = document.querySelector('#measurements');
 const body = measurements.querySelector('tbody');
+const summaryPanel = document.querySelector('#summary');
 const clock = (time) => time.toFixed(2) + ' s';
 const level = (value) => value === null ? '—' : value === -Infinity ? '−∞ dBFS' : value.toFixed(1) + ' dBFS';
 let audioContext;
+let pair;
 
 const slots = ['A', 'B'].map((name) => {
   const panel = template.content.firstElementChild.cloneNode(true);
@@ -30,15 +36,11 @@ function updateComparison() {
   const ready = slots.every((slot) => slot.analysis);
   measurements.hidden = !slots.some((slot) => slot.analysis);
   match.disabled = !ready || slots.some((slot) => slot.analysis.speechLevel === null);
-  for (const slot of slots) {
-    slot.play.disabled = !slot.analysis;
-    if (!slot.gain) continue;
-    const other = slots.find((candidate) => candidate !== slot);
-    const difference = match.checked && !match.disabled
-      ? Math.min(0, other.analysis.speechLevel - slot.analysis.speechLevel)
-      : 0;
-    slot.gain.gain.value = 10 ** (difference / 20);
-  }
+  playBoth.disabled = !ready;
+  split.disabled = !ready;
+  align.disabled = !ready || slots.some((slot) => slot.analysis.speechStart === null);
+  for (const slot of slots) slot.play.disabled = !slot.analysis;
+  updatePlaybackLevels();
   const rows = [
     ['Total duration', (a) => clock(a.duration)],
     ['Estimated speech span', (a) => a.speechSpan === null ? '—' : clock(a.speechSpan)],
@@ -57,11 +59,12 @@ function updateComparison() {
     for (const slot of slots) row.insertCell().textContent = slot.analysis ? format(slot.analysis) : '—';
   }
 
-  const [a, b] = slots.map((slot) => slot.analysis?.speechSpan);
-  const delta = a && b ? b - a : null;
-  document.querySelector('#timing').textContent = delta === null ? ''
-    : Math.abs(delta) < 0.01 ? 'Both takes have about the same estimated speech span.'
-    : 'Take B’s estimated speech span is ' + clock(Math.abs(delta)) + (delta > 0 ? ' longer.' : ' shorter.');
+  summaryPanel.hidden = !ready;
+  if (ready) {
+    const summary = summarizeTakes(slots[0].analysis, slots[1].analysis);
+    document.querySelector('#summary-text').textContent = summary.text;
+    document.querySelector('#summary-tip').textContent = summary.tip;
+  }
 }
 
 function draw(slot) {
@@ -106,7 +109,10 @@ function showPauses(slot) {
 
 async function load(slot, file) {
   if (!file) return;
+  stopPair();
+  pairStatus.textContent = '';
   const attempt = ++slot.attempt;
+  slot.buffer = null;
   slot.analysis = null;
   slot.audio.pause();
   slot.audio.removeAttribute('src');
@@ -140,6 +146,7 @@ async function load(slot, file) {
     const buffer = await decoder.decodeAudioData(data);
     if (attempt !== slot.attempt) return;
     slot.analysis = analyzeTake(buffer);
+    slot.buffer = buffer;
     slot.url = URL.createObjectURL(file);
     slot.audio.src = slot.url;
     slot.status.textContent = file.name;
@@ -151,6 +158,83 @@ async function load(slot, file) {
     if (attempt === slot.attempt) slot.status.textContent = error.message || 'Could not read this WAV.';
   }
 }
+
+function playbackGain(index) {
+  if (!match.checked || match.disabled) return 1;
+  const difference = slots[1 - index].analysis.speechLevel - slots[index].analysis.speechLevel;
+  return 10 ** (Math.min(0, difference) / 20);
+}
+
+function updatePlaybackLevels() {
+  slots.forEach((slot, index) => {
+    const gain = playbackGain(index);
+    if (slot.gain) slot.gain.gain.value = gain;
+    const track = pair?.tracks[index];
+    if (track) {
+      // Leave headroom when the two takes are mixed together.
+      track.gain.gain.value = gain * (split.checked ? 1 : 0.5);
+      track.pan.pan.value = split.checked ? index * 2 - 1 : 0;
+    }
+  });
+}
+
+function stopPair() {
+  if (!pair) return;
+  const previous = pair;
+  pair = undefined;
+  for (const { source, gain, pan } of previous.tracks) {
+    source.onended = null;
+    try { source.stop(); } catch (error) {
+      if (error.name !== 'InvalidStateError') throw error;
+    }
+    source.disconnect();
+    gain.disconnect();
+    pan.disconnect();
+  }
+  playBoth.textContent = 'Play both';
+}
+
+playBoth.onclick = async () => {
+  if (pair) {
+    stopPair();
+    pairStatus.textContent = '';
+    return;
+  }
+  const session = { tracks: [] };
+  pair = session;
+  pairStatus.textContent = '';
+  playBoth.textContent = 'Stop both';
+  try {
+    if (!audioContext) audioContext = new AudioContext();
+    for (const slot of slots) slot.audio.pause();
+    await audioContext.resume();
+    if (pair !== session) return;
+
+    const start = audioContext.currentTime + 0.05;
+    let remaining = slots.length;
+    for (const slot of slots) {
+      const source = audioContext.createBufferSource();
+      const gain = audioContext.createGain();
+      const pan = audioContext.createStereoPanner();
+      // Each take is one voice channel in the combined playback.
+      pan.channelCount = 1;
+      pan.channelCountMode = 'explicit';
+      source.buffer = slot.buffer;
+      source.connect(gain).connect(pan).connect(audioContext.destination);
+      session.tracks.push({ source, gain, pan });
+      source.onended = () => {
+        if (--remaining === 0 && pair === session) stopPair();
+      };
+      source.start(start, align.checked && !align.disabled ? slot.analysis.speechStart : 0);
+    }
+    updatePlaybackLevels();
+  } catch {
+    if (pair === session) {
+      stopPair();
+      pairStatus.textContent = 'Could not start both takes. Try Play both again.';
+    }
+  }
+};
 
 function connectPlayback(slot) {
   if (!audioContext) audioContext = new AudioContext();
@@ -178,6 +262,7 @@ for (const slot of slots) {
     void load(slot, event.dataTransfer.files[0]);
   };
   slot.play.onclick = async () => {
+    stopPair();
     try {
       const resume = connectPlayback(slot);
       const play = slot.audio.play();
@@ -185,6 +270,7 @@ for (const slot of slots) {
     } catch { slot.status.textContent = 'Playback could not start. Try pressing play again.'; }
   };
   slot.audio.onplay = () => {
+    stopPair();
     for (const other of slots) if (other !== slot) other.audio.pause();
     void connectPlayback(slot).catch(() => {});
   };
@@ -195,4 +281,5 @@ for (const slot of slots) {
   };
   new ResizeObserver(() => draw(slot)).observe(slot.canvas);
 }
-match.onchange = updateComparison;
+match.onchange = updatePlaybackLevels;
+split.onchange = updatePlaybackLevels;

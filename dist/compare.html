@@ -18,9 +18,12 @@
 <h1>Compare takes</h1>
 <p class="intro">Choose two WAV recordings of the same script. Compare their timing and levels, then listen to the differences.</p>
 <div class="compare-controls">
-<div class="actions"><button id="play-a" disabled>Play A</button><button id="play-b" disabled>Play B</button></div>
+<div class="actions"><button id="play-a" disabled>Play A</button><button id="play-b" disabled>Play B</button><button id="play-both" class="primary" disabled>Play both</button></div>
 <label class="check"><input id="match" type="checkbox" disabled> Match playback levels</label>
+<label class="check"><input id="align" type="checkbox" disabled> Align at first speech</label>
+<label class="check"><input id="split" type="checkbox" disabled> A left / B right</label>
 </div>
+<p id="pair-status" class="feedback" role="status"></p>
 <div id="takes" class="compare-grid"></div>
 <template id="take-template">
 <section class="panel">
@@ -35,10 +38,16 @@
 </div>
 </section>
 </template>
+<section id="summary" class="panel measurements" aria-labelledby="summary-title" hidden>
+<h2 id="summary-title">Comparison summary</h2>
+<div role="status" aria-atomic="true">
+<p id="summary-text"></p>
+<p><strong>Listen for:</strong> <span id="summary-tip"></span></p>
+</div>
+</section>
 <section id="measurements" class="panel measurements" hidden>
 <h2>Measurements</h2>
 <table><thead><tr><th scope="col">Measure</th><th scope="col">Take A</th><th scope="col">Take B</th></tr></thead><tbody></tbody></table>
-<p id="timing" class="feedback" role="status"></p>
 <p class="feedback">Speech span and pauses are estimated from signal level. Quiet passages, music, and room noise can affect detection.</p>
 </section>
 </main>
